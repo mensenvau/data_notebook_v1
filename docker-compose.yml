@@ -1,0 +1,84 @@
+services:
+  jupyterhub:
+    build: ./jupyter
+    container_name: jupyterhub
+    restart: always
+    ports:
+      - "8000:8000"
+    volumes:
+      - jupyterhub_data:/srv/jupyterhub
+      - shared_data:/home/admin/notebooks
+    environment:
+      JUPYTERHUB_ADMIN: admin
+    networks:
+      - spark-network
+
+  spark-master:
+    build: ./spark
+    container_name: spark-master
+    environment:
+      - SPARK_LOCAL_IP=spark-master
+      - SPARK_WORKLOAD=master
+    ports:
+      - "7077:7077"
+      - "8080:8080"
+    volumes:
+      - shared_data:/home/admin/notebooks
+      - spark_data:/opt/spark-data
+      - spark_apps:/opt/spark-apps
+    networks:
+      - spark-network
+    command: ["entrypoint.sh", "master"]
+
+  spark-worker-1:
+    build: ./spark
+    container_name: spark-worker-1
+    environment:
+      - SPARK_WORKER_CORES=2
+      - SPARK_MASTER=spark://spark-master:7077
+      - SPARK_WORKER_CORES=1
+      - SPARK_WORKER_MEMORY=2G
+      - SPARK_DRIVER_MEMORY=2G
+      - SPARK_EXECUTOR_MEMORY=1G
+      - SPARK_WORKLOAD=worker
+      - SPARK_LOCAL_IP=spark-worker-1
+    volumes:
+      - shared_data:/home/admin/notebooks
+      - spark_data:/opt/spark-data
+      - spark_apps:/opt/spark-apps
+    networks:
+      - spark-network
+    command: ["entrypoint.sh", "worker"]
+
+networks:
+  spark-network:
+    driver: bridge
+
+volumes:
+  jupyterhub_data:
+    driver: local
+    driver_opts:
+      type: "none"
+      device: "./data/jupyterhub_data"
+      o: "bind"
+
+  spark_data:
+    driver: local
+    driver_opts:
+      type: "none"
+      device: "./data/spark_data"
+      o: "bind"
+
+  shared_data:
+    driver: local
+    driver_opts:
+      type: "none"
+      device: "./data/shared_data"
+      o: "bind"
+
+  spark_apps:
+    driver: local
+    driver_opts:
+      type: "none"
+      device: "./data/spark_apps"
+      o: "bind"
